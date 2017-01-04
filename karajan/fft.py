@@ -12,10 +12,22 @@ def stft(wav, n_fft=1024, overlap=4, dt=tf.int32, absp=False):
     ## prepare constant variable
     Pi = tf.constant(np.pi, dtype=tf.float32)
     W = tf.constant(scipy.hanning(n_fft), dtype=tf.float32)
-    S = tf.pack([tf.fft(tf.cast(tf.multiply(W,X[i:i+n_fft]),tf.complex64)) for i in range(1, wav.shape[0] - n_fft, hop)])
+    S = tf.pack([tf.fft(tf.cast(tf.multiply(W,X[i:i+n_fft]),\
+            tf.complex64)) for i in range(1, wav.shape[0] - n_fft, hop)])
+    abs_S = tf.complex_abs(S)
     sess = tf.Session()
-    hahaha = sess.run(S,feed_dict={X:wav})
-    return hahaha
+    if absp:
+        return sess.run(abs_S, feed_dict={X:wav})
+    else:
+        return sess.run(S, feed_dict={X:wav})
+
+def istft(spec, overlap=4):
+    assert (spec.shape[0] > 1)
+    S = placeholder(dtype=tf.complex64, shape=spec.shape)
+    X = tf.complex_abs(tf.concat(0, [tf.ifft(frame) \
+            for frame in tf.unstack(S)]))
+    sess = tf.Session()
+    return sess.run(X, feed_dict={S:spec})
 if __name__ == '__main__':
     a = np.arange(30000)
     print stft(a).shape
