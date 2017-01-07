@@ -23,6 +23,10 @@ def stft(wav, n_fft=1024, overlap=4, dt=tf.int32, absp=False):
 
 def istft(spec, overlap=4):
     assert (spec.shape[0] > 1)
+    n_fft = 2 * (spec.shape[1]-1)
+    hop = n_fft / overlap
+    ## prepare costant variable
+    W = tf.constant(scipy.hanning(n_fft), dtype=tf.float32)
     S = placeholder(dtype=tf.complex64, shape=spec.shape)
     X = tf.complex_abs(tf.concat(0, [tf.ifft(frame) \
             for frame in tf.unstack(S)]))
