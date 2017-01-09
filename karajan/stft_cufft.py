@@ -1,24 +1,24 @@
 import pycuda.autoinit
 import pycuda.gpuarray as gpuarray
 from skcuda.fft import *
+import skcuda.linalg as linalg
+linalg.init()
 import scipy, pylab
 import numpy as np
 import scipy.io.wavfile as wave
-
+import stftmo
 def stft(x, fftsize=1024, overlap=4):   
-    x = x[:1600*10]
+    x = np.asarray(x, np.float32)
     hop = fftsize / overlap
-    w = scipy.hanning(fftsize)  
-    unroll_x = np.asarray([w*x[i:i+fftsize] for i in range(0, len(x)-fftsize, hop)], np.float32)
+    w = np.asarray(scipy.hanning(fftsize), np.float32)
+    unroll_x = np.asarray([x[i:i+fftsize] for i in range(0, x.shape[0]-fftsize, hop)], np.float32)
     plan = Plan(shape=fftsize, in_dtype=np.float32, out_dtype=np.complex64, batch=unroll_x.shape[0], idist=fftsize, odist=fftsize/2+1)
-    print unroll_x.shape
+    w_gpu = gpuarray.to_gpu(np.tile(w, unroll_x.shape[0]))
     x_gpu = gpuarray.to_gpu(unroll_x.flatten())
-    xf_gpu = gpuarray.empty(fftsize/2+1*unroll_x.shape[1], np.complex64)
-    fft(x_gpu, xf_gpu, plan)
-    s = x_gpu.get()
+    xf_gpu = gpuarray.empty((fftsize/2+1)*unroll_x.shape[0], np.complex64)
+    fft(linalg.multiply(w_gpu,x_gpu), xf_gpu, plan)
+    s = xf_gpu.get()
     return s
-
-
 def istft(X, scale = 1, overlap=4):   
     fftsize=(X.shape[1]-1)*2
     hop = fftsize / overlap
@@ -42,8 +42,21 @@ if __name__ == '__main__':
     (rate, rawData) = wave.read(FILE)
     
     LEN = rawData.shape[0]
-    spec = stft(rawData, fftsize=256)
-    
+    rawData = np.repeat(rawData, 1) 
+    import time
+    s = time.time()
+    spec = np.abs(stft(rawData, fftsize=1024))
+    print time.time() - s,'s'
+   
+    import librosa
+    s = time.time()
+    spec_or = np.abs(stftmo.stft(rawData, fftsize=1024))
+    print spec_or.shape
+    print time.time() - s,'s'
+    #print np.allclose(spec,spec_or.flatten(),atol=1e-1)
+    print np.sum(spec)
+    print sum(spec_or.flatten())
+    print np.sum(np.abs(spec-spec_or.flatten()))
     '''    reCon = istft(spec)
     print type(rawData[0])
     print type(rawData[0])
